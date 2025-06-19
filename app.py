@@ -8,6 +8,32 @@ from fpdf import FPDF
 st.set_page_config(page_title="Vedic Astro Dashboard", layout="centered")
 st.title("🪐 Vedic Astro-Tech Forecast Dashboard")
 
+
+# --- User Input for Birth Details ---
+st.header("🔢 Enter Your Birth Details")
+
+with st.form("user_birth_form"):
+    name = st.text_input("Your Name", value="User")
+    dob = st.date_input("Date of Birth", datetime.date(1984, 9, 12))
+    tob = st.time_input("Time of Birth", datetime.time(2, 40))
+    lat = st.number_input("Latitude", value=25.45)
+    lon = st.number_input("Longitude", value=81.84)
+    tz = st.number_input("Time Zone (e.g. 5.5 for IST)", value=5.5)
+    submitted = st.form_submit_button("Generate My Forecast")
+
+if submitted:
+    dt = datetime.datetime.combine(dob, tob)
+    jd = swe.julday(dt.year, dt.month, dt.day, dt.hour + dt.minute / 60.0) - tz / 24.0
+    st.success(f"Forecast generated for {name}")
+    st.session_state['jd'] = jd
+    st.session_state['birth_year'] = dob.year
+    st.session_state['name'] = name
+    st.session_state['tz'] = tz
+else:
+    st.warning("Please fill your details above and click 'Generate My Forecast' to continue.")
+    st.stop()
+
+
 # --- Weekly Forecast Section ---
 st.header("🗓️ Weekly Forecast")
 today = datetime.date.today()
@@ -160,12 +186,13 @@ def calculate_dasha_from_moon(jd_birth, birth_year):
             break
     return timeline
 
-birth_dt = datetime.datetime(1984, 9, 12, 2, 40)
-tz = 5.5
-jd = swe.julday(birth_dt.year, birth_dt.month, birth_dt.day,
-                birth_dt.hour + birth_dt.minute / 60.0) - tz / 24.0
+dt = datetime.datetime.combine(dob, tob)
+birth_dt = dt
+tz = st.session_state.get('tz', 5.5)
+jd = st.session_state.get('jd', swe.julday(birth_dt.year, birth_dt.month, birth_dt.day,
+                birth_dt.hour + birth_dt.minute / 60.0) - tz / 24.0)
 
-dasha_data = calculate_dasha_from_moon(jd, birth_dt.year)
+dasha_data = calculate_dasha_from_moon(st.session_state['jd'], st.session_state['birth_year'])
 for planet, start, end in dasha_data:
     st.write(f"**{planet}**: {start} → {end}")
 
@@ -204,3 +231,51 @@ st.table({ "Planet": [p[0] for p in planet_data],
             "Sign": [p[1] for p in planet_data],
             "Degree": [f"{p[2]:.2f}" for p in planet_data],
             "House": [p[3] for p in planet_data] })
+
+# --- Gun Milan Compatibility Scoring ---
+st.header("💖 Gun Milan Compatibility Scoring")
+
+def get_nakshatra_index(jd):
+    moon_pos, _ = swe.calc_ut(jd, swe.MOON)
+    ayanamsa = swe.get_ayanamsa_ut(jd)
+    sidereal_moon = (moon_pos[0] - ayanamsa) % 360
+    return int(sidereal_moon // (13 + 1/3))
+
+with st.form("gun_milan_form"):
+    st.subheader("Person 1 Details")
+    dob1 = st.date_input("Date of Birth 1", datetime.date(1990, 1, 1), key="dob1")
+    tob1 = st.time_input("Time of Birth 1", datetime.time(10, 0), key="tob1")
+    tz1 = st.number_input("Timezone 1", value=5.5, key="tz1")
+
+    st.subheader("Person 2 Details")
+    dob2 = st.date_input("Date of Birth 2", datetime.date(1992, 2, 2), key="dob2")
+    tob2 = st.time_input("Time of Birth 2", datetime.time(12, 0), key="tob2")
+    tz2 = st.number_input("Timezone 2", value=5.5, key="tz2")
+
+    submit_compat = st.form_submit_button("Check Compatibility")
+
+if submit_compat:
+    dt1 = datetime.datetime.combine(dob1, tob1)
+    dt2 = datetime.datetime.combine(dob2, tob2)
+    jd1 = swe.julday(dt1.year, dt1.month, dt1.day, dt1.hour + dt1.minute / 60) - tz1 / 24
+    jd2 = swe.julday(dt2.year, dt2.month, dt2.day, dt2.hour + dt2.minute / 60) - tz2 / 24
+
+    n1 = get_nakshatra_index(jd1)
+    n2 = get_nakshatra_index(jd2)
+    distance = abs(n1 - n2)
+    max_distance = 27
+    gun_score = round((36 - (distance * 1.3)), 2)
+    gun_score = max(0, min(36, gun_score))  # Bound the score
+
+    st.write(f"Moon Nakshatra Index 1: {n1}")
+    st.write(f"Moon Nakshatra Index 2: {n2}")
+    st.subheader(f"💑 Gun Milan Score: {gun_score} / 36")
+
+    if gun_score >= 30:
+        st.success("✅ Excellent match!")
+    elif gun_score >= 24:
+        st.info("👍 Good match.")
+    elif gun_score >= 18:
+        st.warning("⚠️ Caution advised.")
+    else:
+        st.error("❌ Poor compatibility.")

@@ -1,4 +1,3 @@
-
 import streamlit as st
 import datetime
 import smtplib
@@ -120,3 +119,88 @@ if st.button("Send Email"):
         st.success("Email sent successfully!")
     except Exception as e:
         st.error(f"Email failed: {e}")
+
+# --- Vimshottari Dasha Placeholder ---
+st.header("🔄 Vimshottari Dasha (Coming Soon)")
+st.info("This section will calculate and display your Dasha periods based on Moon Nakshatra.")
+
+# --- Real-Time Planetary Transits Placeholder ---
+st.header("🪐 Current Planetary Transits (Coming Soon)")
+st.info("This will show current sidereal planetary positions relative to your Ascendant.")
+
+# --- Gun Milan Compatibility Scoring Placeholder ---
+st.header("💖 Gun Milan Score (Coming Soon)")
+st.info("This will analyze Moon Nakshatra matches and provide a compatibility score out of 36.")
+
+# --- Vimshottari Dasha Timeline ---
+import swisseph as swe
+
+st.header("🔄 Vimshottari Dasha")
+
+def calculate_dasha_from_moon(jd_birth, birth_year):
+    dasha_sequence = [
+        ("Ketu", 7), ("Venus", 20), ("Sun", 6), ("Moon", 10), ("Mars", 7),
+        ("Rahu", 18), ("Jupiter", 16), ("Saturn", 19), ("Mercury", 17)
+    ]
+    nakshatra_lords = ["Ketu", "Venus", "Sun", "Moon", "Mars", "Rahu",
+                       "Jupiter", "Saturn", "Mercury"] * 3
+    swe.set_sid_mode(swe.SIDM_LAHIRI)
+    moon_pos, _ = swe.calc_ut(jd_birth, swe.MOON)
+    ayanamsa = swe.get_ayanamsa_ut(jd_birth)
+    sidereal_moon = (moon_pos[0] - ayanamsa) % 360
+    nakshatra_index = int(sidereal_moon // (13 + 1/3))
+    dasha_lord = nakshatra_lords[nakshatra_index]
+    start_index = [i for i, (p, _) in enumerate(dasha_sequence) if p == dasha_lord][0]
+    timeline = []
+    current_year = birth_year
+    for planet, years in dasha_sequence[start_index:] + dasha_sequence[:start_index]:
+        timeline.append((planet, current_year, current_year + years))
+        current_year += years
+        if len(timeline) >= 6:
+            break
+    return timeline
+
+birth_dt = datetime.datetime(1984, 9, 12, 2, 40)
+tz = 5.5
+jd = swe.julday(birth_dt.year, birth_dt.month, birth_dt.day,
+                birth_dt.hour + birth_dt.minute / 60.0) - tz / 24.0
+
+dasha_data = calculate_dasha_from_moon(jd, birth_dt.year)
+for planet, start, end in dasha_data:
+    st.write(f"**{planet}**: {start} → {end}")
+
+# --- Real-Time Planetary Transits ---
+st.header("🌐 Current Planetary Transits (Sidereal)")
+
+signs = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
+         "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
+
+def get_transits(jd_now, lagna_sign):
+    swe.set_sid_mode(swe.SIDM_LAHIRI)
+    planets = [
+        (swe.SUN, "Sun"), (swe.MOON, "Moon"), (swe.MERCURY, "Mercury"),
+        (swe.VENUS, "Venus"), (swe.MARS, "Mars"), (swe.JUPITER, "Jupiter"),
+        (swe.SATURN, "Saturn"), (swe.TRUE_NODE, "Rahu")
+    ]
+    transits = []
+    ayanamsa = swe.get_ayanamsa_ut(jd_now)
+    for pid, name in planets:
+        pos, _ = swe.calc_ut(jd_now, pid)
+        sidereal_lon = (pos[0] - ayanamsa) % 360
+        sign_index = int(sidereal_lon // 30)
+        degree = sidereal_lon % 30
+        house = ((sign_index - lagna_sign + 12) % 12) + 1
+        transits.append((name, signs[sign_index], degree, house))
+    return transits
+
+# Assume Lagna is Cancer (index 3)
+jd_now = swe.julday(datetime.datetime.utcnow().year, datetime.datetime.utcnow().month,
+                    datetime.datetime.utcnow().day)
+lagna_index = 3  # Cancer Lagna
+planet_data = get_transits(jd_now, lagna_index)
+
+st.write("Lagna (Ascendant) assumed: **Cancer**")
+st.table({ "Planet": [p[0] for p in planet_data],
+            "Sign": [p[1] for p in planet_data],
+            "Degree": [f"{p[2]:.2f}" for p in planet_data],
+            "House": [p[3] for p in planet_data] })
